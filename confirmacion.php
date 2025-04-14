@@ -6,10 +6,17 @@ require 'vendor/autoload.php'; // Incluir el autoloader de Composer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+// Depuración: Verificar el contenido de la sesión
+
+
 // Verificar que existan los datos necesarios en la sesión
-if (!isset($_SESSION['fecha']) || !isset($_SESSION['hora']) || !isset($_SESSION['profesional']) || !isset($_SESSION['servicio']) || !isset($_SESSION['telefono']) || !isset($_SESSION['gmail'])) {
-    header('Location: fecha.php');
-    exit();
+$required_fields = ['fecha', 'hora', 'nombre_paciente', 'profesional', 'servicio', 'telefono', 'gmail', 'obra_social', 'sede'];
+$missing_fields = [];
+
+foreach ($required_fields as $field) {
+    if (!isset($_SESSION[$field])) {
+        $missing_fields[] = $field;
+    }
 }
 
 // Datos del turno
@@ -18,109 +25,79 @@ $servicio = $_SESSION['servicio'];
 $profesional = $_SESSION['profesional'];
 $fecha = $_SESSION['fecha'];
 $hora = $_SESSION['hora'];
+$nombre = $_SESSION['nombre_paciente']; // Cambiado de nombre a nombre_paciente
 $telefono = $_SESSION['telefono'];
 $gmail = $_SESSION['gmail'];
+$obra_social = $_SESSION['obra_social'];
+
+// Conectar a la base de datos
+$mysqli = new mysqli("localhost", "root", "", "turnos");
+
+if ($mysqli->connect_error) {
+    die("Error de conexión: " . $mysqli->connect_error);
+}
+
+// Insertar el turno en la base de datos
+$stmt = $mysqli->prepare("INSERT INTO turnos (sede, servicio, profesional, fecha, hora, nombre, gmail, telefono, obra_social) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+if ($stmt) {
+    $stmt->bind_param("sssssssss", $sede, $servicio, $profesional, $fecha, $hora, $nombre, $gmail, $telefono, $obra_social);
+    if (!$stmt->execute()) {
+        die("Error al registrar el turno: " . $stmt->error);
+    }
+    $stmt->close();
+} else {
+    die("Error al preparar la consulta: " . $mysqli->error);
+}
+
+// Cerrar conexión
+$mysqli->close();
+
+// Enviar el correo de confirmación
 $to_email = $gmail;
 $subject = 'Confirmación de Turno - Kaizen';
-
-// Crear el mensaje de WhatsApp
-$body =  "¡Hola! Tu turno ha sido confirmado.\nDetalles del turno:\nSede: $sede\nServicio: $servicio\nProfesional: $profesional\nFecha: $fecha\nHora: $hora\nPor favor, recuerda traer ropa deportiva cómoda para una óptima sesión.\n¡Te esperamos!";
-$from_email = 'oligiatielizondo@gmail.com';
 
 // Crear el mensaje de correo electrónico
 $mensaje_email = "
 <html>
 <head>
     <title>Detalles de tu turno</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: auto;
-            background-color: #ffffff;
-            padding: 20px;
-            border: 1px solid #dddddd;
-            border-radius: 10px;
-        }
-        .email-header {
-            text-align: center;
-            padding-bottom: 20px;
-        }
-        .email-header img {
-            max-width: 100px;
-        }
-        .email-body {
-            padding: 20px;
-        }
-        .email-body h2 {
-            color: #333333;
-        }
-        .email-body p {
-            color: #555555;
-        }
-        .email-footer {
-            text-align: center;
-            padding-top: 20px;
-            color: #888888;
-            font-size: 12px;
-        }
-    </style>
 </head>
 <body>
-    <div class='email-container'>
-        <div class='email-header'>
-            <img src='cid:logo_img' alt='Kaizen'>
-        </div>
-        <div class='email-body'>
-            <h2>¡Turno Confirmado con Éxito!</h2>
-            <p>Gracias por confiar en Kaizen. Aquí están los detalles de tu turno:</p>
-            <p><strong>Sede:</strong> $sede</p>
-            <p><strong>Servicio:</strong> $servicio</p>
-            <p><strong>Profesional:</strong> $profesional</p>
-            <p><strong>Fecha:</strong> $fecha</p>
-            <p><strong>Hora:</strong> $hora</p>
-            <p>Por favor, recuerda traer ropa deportiva cómoda para una óptima sesión.</p>
-        </div>
-        <div class='email-footer'>
-            <p>Kaizen - Centro De Kinesiologia</p>
-            <p>© 2025 Kaizen </p>
-        </div>
+    <h2>¡Turno Confirmado con Éxito!</h2>
+    <p>Gracias por confiar en Kaizen. Aquí están los detalles de tu turno:</p>
+    <p><strong>Sede:</strong> $sede</p>
+    <p><strong>Servicio:</strong> $servicio</p>
+    <p><strong>Profesional:</strong> $profesional</p>
+    <p><strong>Nombre:</strong> $nombre</p>
+    <p><strong>Fecha:</strong> $fecha</p>
+    <p><strong>Hora:</strong> $hora</p>
+    <p><strong>Obra Social:</strong> $obra_social</p>
 </body>
 </html>
 ";
 
-// Enviar el correo
 $mail = new PHPMailer(true);
+
 try {
     // Configuración del servidor
     $mail->isSMTP();
     $mail->Host = 'smtp.gmail.com'; // Servidor SMTP de Gmail
     $mail->SMTPAuth = true;
-    $mail->Username = $from_email; // Tu dirección de correo
+    $mail->Username = 'oligiatielizondo@gmail.com'; // Tu dirección de correo
     $mail->Password = 'ostc ewyt kjhy firp'; // Tu contraseña de aplicación generada
     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
     $mail->Port = 587;
 
     // Configuración del correo
-    $mail->setFrom($from_email, 'Kaizen');
+    $mail->setFrom('oligiatielizondo@gmail.com', 'Kaizen');
     $mail->addAddress($to_email);
     $mail->Subject = $subject;
     $mail->Body = $mensaje_email;
-    $mail->isHTML(true); // Establecer el formato del correo a HTML
-    $mail->CharSet = PHPMailer::CHARSET_UTF8; // Asegurarse de que la codificación sea UTF-8
-
-    // Adjuntar imagen
-    $mail->addEmbeddedImage('img/ISO_violeta.png', 'logo_img');
+    $mail->isHTML(true);
 
     $mail->send();
-    $message = 'El correo ha sido enviado con éxito.';
 } catch (Exception $e) {
-    $message = 'El correo no pudo ser enviado. Error: ' . $mail->ErrorInfo;
+    echo "El correo no pudo ser enviado. Error: {$mail->ErrorInfo}";
 }
 ?>
 <!DOCTYPE html>
@@ -138,43 +115,6 @@ try {
     <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
     <link rel="icon" href="img/ISO_Violeta.png">
     <title>Turno Confirmado</title>
-    <style>
-        .whatsapp-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: #25D366;
-            color: white;
-            border: none;
-            width: 60px;
-            height: 60px;
-            border-radius: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: background-color 0.3s ease;
-            text-decoration: none;
-        }
-        .whatsapp-button:hover {
-            background-color:rgb(16, 153, 66);
-        }
-
-        .nota {
-            background-color:rgb(197, 106, 204);
-            color: #000;
-            padding: 0px;
-            border-radius: 10px;
-            text-align: center;
-            margin: auto;
-            max-width: 300px;
-            font-size: 14px;
-            position: relative;
-            top: 15px;
-            font-weight: 600;
-        }
-    </style>
 </head>
 <body>
     <header>
@@ -191,16 +131,11 @@ try {
         <p><strong>Sede:</strong> <?= $sede; ?></p>
         <p><strong>Servicio:</strong> <?= $servicio; ?></p>
         <p><strong>Profesional:</strong> <?= $profesional; ?></p>
+        <p><strong>Nombre:</strong> <?= $nombre; ?></p>
         <p><strong>Fecha:</strong> <?= $fecha; ?></p>
         <p><strong>Hora:</strong> <?= $hora; ?></p>
+        <p><strong>Obra Social:</strong> <?= $obra_social; ?></p>
         <a href="index.php" class="btn-volver" style="color: #fff !important;">Volver al Inicio</a>
     </div>
-    <div class="nota">
-        <p>¡¡Recuerda traer ropa deportiva cómoda para una óptima sesión!!</p>
-    </div>
-    <!-- Botón de WhatsApp -->
-    <a href="https://wa.me/5492915347980" class="whatsapp-button" target="_blank">
-      <i style="color: #fff;" class="fa-solid fa-phone"></i>
-    </a>
 </body>
 </html>
