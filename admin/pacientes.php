@@ -95,136 +95,102 @@ if (!isset($_SESSION['disponibilidadProfesionales'])) {
 
 $disponibilidadProfesionales = $_SESSION['disponibilidadProfesionales'];
 
-// Función para deshabilitar horarios solo para la semana actual
-function deshabilitarHorarios(&$disponibilidad, $profesional, $sede) {
-    $diasSemana = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    $inicioSemana = new DateTime();
-    $inicioSemana->modify('this week'); // Obtén el inicio de la semana actual
-    $finSemana = clone $inicioSemana;
-    $finSemana->modify('+6 days'); // Obtén el final de la semana actual
-    
-    foreach ($diasSemana as $dia) {
-        $fechaDia = clone $inicioSemana;
-        $fechaDia->modify($dia);
-        if ($fechaDia >= $inicioSemana && $fechaDia <= $finSemana) {
-            if (isset($disponibilidad[$profesional][$sede][$dia])) {
-                foreach ($disponibilidad[$profesional][$sede][$dia] as &$hora) {
-                    $hora = "No disponible"; // Marcamos la hora como no disponible
-                }
+// Inicialización del array de días deshabilitados
+if (!isset($_SESSION['diasDeshabilitados'])) {
+    $_SESSION['diasDeshabilitados'] = [];
+}
+
+// Manejo de deshabilitación de días específicos
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['deshabilitar_dia'])) {
+        $fecha_deshabilitar = $_POST['fecha_deshabilitar'];
+        
+        // Inicializar array para profesional y sede si no existe
+        if (!isset($_SESSION['diasDeshabilitados'][$profesional])) {
+            $_SESSION['diasDeshabilitados'][$profesional] = [];
+        }
+        if (!isset($_SESSION['diasDeshabilitados'][$profesional][$sede])) {
+            $_SESSION['diasDeshabilitados'][$profesional][$sede] = [];
+        }
+        
+        // Agregar la fecha al array de días deshabilitados
+        if (!in_array($fecha_deshabilitar, $_SESSION['diasDeshabilitados'][$profesional][$sede])) {
+            $_SESSION['diasDeshabilitados'][$profesional][$sede][] = $fecha_deshabilitar;
+        }
+        
+        echo "<script>alert('Día deshabilitado correctamente.'); window.location.href='pacientes.php';</script>";
+    } elseif (isset($_POST['habilitar_dia'])) {
+        $fecha_habilitar = $_POST['fecha_habilitar'];
+        
+        // Eliminar la fecha del array de días deshabilitados
+        if (isset($_SESSION['diasDeshabilitados'][$profesional][$sede])) {
+            $key = array_search($fecha_habilitar, $_SESSION['diasDeshabilitados'][$profesional][$sede]);
+            if ($key !== false) {
+                unset($_SESSION['diasDeshabilitados'][$profesional][$sede][$key]);
+                $_SESSION['diasDeshabilitados'][$profesional][$sede] = array_values($_SESSION['diasDeshabilitados'][$profesional][$sede]); // Reindexar
             }
         }
+        
+        echo "<script>alert('Día habilitado correctamente.'); window.location.href='pacientes.php';</script>";
     }
 }
 
-// Función para habilitar horarios
-function habilitarHorarios(&$disponibilidad, $profesional, $sede) {
-    $originalDisponibilidad = [
-        'Franco Schroh' => [
-            'Kaizen Rodríguez' => [
-                'Monday' => ['17:00', '18:00', '19:00'],
-                'Tuesday' => ['15:00', '16:00', '17:00'],
-                'Wednesday' => ['17:00', '18:00', '19:00'],
-                'Thursday' => ['15:00', '16:00', '17:00'],
-                'Friday' => ['17:00', '18:00', '19:00']
-            ],
-            'Kaizen Darregueira' => []
-        ],
-        'Francisco Gomez' => [
-            'Kaizen Rodríguez' => [
-                'Monday' => ['08:00', '09:00', '10:00', '11:00', '12:00'],
-                'Thursday' => ['08:00', '09:00', '10:00', '11:00', '12:00'],
-                'Friday' => ['08:00', '09:00', '10:00', '11:00', '12:00'],
-            ],
-            'Kaizen Darregueira' => [
-                'Monday' => ['07:30', '08:30', '09:30', '10:30'],
-                'Wednesday' => ['07:30', '08:30', '09:30', '10:30'],
-                'Friday' => ['07:30', '08:30', '09:30', '10:30']
-            ]
-        ],
-        'Gaston Olgiati' => [
-            'Kaizen Darregueira' => [
-                'Tuesday' => ['16:00', '17:00'],
-                'Thursday' => ['16:00', '17:00']
-            ]
-        ],
-        'Gaston Coto' => [
-            'Kaizen Rodríguez' => [
-                'Tuesday' => ['11:00'],
-                'Thursday' => ['11:00']
-            ],
-            'Kaizen Darregueira' => [
-                'Monday' => ['16:00'],
-                'Wednesday' => ['16:00'],
-                'Friday' => ['16:00']
-            ]
-        ],
-        'Sebastián Mazzeo' => [
-            'Kaizen Rodríguez' => [
-                'Tuesday' => ['14:00', '15:00'],
-                'Wednesday' => ['14:00', '15:00'],
-                'Friday' => ['14:00', '15:00']
-            ],
-            'Kaizen Darregueira' => [
-                'Tuesday' => ['09:30', '10:30'],
-                'Thursday' => ['09:30', '10:30']
-            ]
-        ],
-        'Micaela Pérez' => [
-            'Kaizen Rodríguez' => [
-                'Monday' => ['10:00', '11:00', '12:00', '20:00'],
-                'Wednesday' => ['10:00', '11:00', '12:00'],
-                'Thursday' => ['20:00'],
-                'Friday' => ['10:00', '11:00', '12:00']
-            ]
-        ],
-        'Marcos Luis' => [
-            'Kaizen Rodríguez' => [
-                'Monday' => ['13:00', '14:00'],
-                'Wednesday' => ['13:00', '14:00'],
-                'Friday' => ['13:00', '14:00']
-            ],
-            'Kaizen Darregueira' => [
-                'Tuesday' => ['13:30'],
-                'Thursday' => ['13:30']
-            ]
-        ],
-        'Leonel Scolari' => [
-            'Kaizen Rodríguez' => [
-                'Monday' => ['08:00', '09:00'],
-                'Tuesday' => ['11:00', '12:00'],
-                'Thursday' => ['11:00', '12:00'],
-                'Friday' => ['08:00', '09:00']
-            ]
-        ]
-    ];
+// Período de visualización (día, semana, mes)
+$periodo = isset($_GET['periodo']) ? $_GET['periodo'] : 'mes';
 
-    $disponibilidad[$profesional][$sede] = $originalDisponibilidad[$profesional][$sede];
-}
+// Obtener el mes seleccionado (mes actual por defecto)
+$mes_actual = date('m');
+$anio_actual = date('Y');
+$mes = isset($_GET['mes']) ? $_GET['mes'] : $mes_actual;
+$anio = isset($_GET['anio']) ? $_GET['anio'] : $anio_actual;
 
-// Manejar las solicitudes POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['deshabilitar'])) {
-        deshabilitarHorarios($disponibilidadProfesionales, $profesional, $sede);
-        $_SESSION['disponibilidadProfesionales'] = $disponibilidadProfesionales;
-        echo "<script>alert('Horarios deshabilitados.'); window.location.href='pacientes.php';</script>";
-    } elseif (isset($_POST['habilitar'])) {
-        habilitarHorarios($disponibilidadProfesionales, $profesional, $sede);
-        $_SESSION['disponibilidadProfesionales'] = $disponibilidadProfesionales;
-        echo "<script>alert('Horarios habilitados.'); window.location.href='pacientes.php';</script>";
+// Calcular mes anterior y siguiente
+function obtenerMesAnterior($mes, $anio) {
+    if ($mes == 1) {
+        return [12, $anio - 1];
     }
+    return [$mes - 1, $anio];
 }
 
-// Verificar si se ha presionado el botón para ver pacientes anteriores o siguientes
-$ver_anteriores = isset($_GET['ver_anteriores']) && $_GET['ver_anteriores'] == '1';
-$ver_siguientes = isset($_GET['ver_siguientes']) && $_GET['ver_siguientes'] == '1';
+function obtenerMesSiguiente($mes, $anio) {
+    if ($mes == 12) {
+        return [1, $anio + 1];
+    }
+    return [$mes + 1, $anio];
+}
+
+list($mes_anterior, $anio_anterior) = obtenerMesAnterior($mes, $anio);
+list($mes_siguiente, $anio_siguiente) = obtenerMesSiguiente($mes, $anio);
 
 // Variables para búsqueda
 $busqueda_nombre = isset($_GET['nombre']) ? $_GET['nombre'] : '';
 $busqueda_obra_social = isset($_GET['obra_social']) ? $_GET['obra_social'] : '';
-$profesional = $_SESSION['profesional'];
+
+// Inicializar la conexión a la base de datos
+$conn = new mysqli('localhost', 'root', '', 'turnos');
+if ($conn->connect_error) {
+    die("Error de conexión: " . $conn->connect_error);
+}
+
+// Determinar el rango de fechas según el período seleccionado
+$fecha_hoy = date('Y-m-d');
+switch ($periodo) {
+    case 'dia':
+        $fecha_ini = $fecha_hoy;
+        $fecha_fin = $fecha_hoy;
+        break;
+    case 'semana':
+        $fecha_ini = date('Y-m-d', strtotime('monday this week'));
+        $fecha_fin = date('Y-m-d', strtotime('sunday this week'));
+        break;
+    case 'mes':
+    default:
+        $fecha_ini = "$anio-$mes-01";
+        $fecha_fin = date('Y-m-t', strtotime($fecha_ini));
+        break;
+}
 
 // Inicializar la consulta para obtener pacientes
-$conn = new mysqli('localhost', 'root', '', 'turnos'); // Definir la conexión a la base de datos
 $sql = "SELECT * FROM turnos WHERE profesional = ?";
 $params = [$profesional];
 $param_types = 's';
@@ -242,18 +208,13 @@ if ($busqueda_obra_social != '') {
     $param_types .= 's';
 }
 
-// Filtrar por el mes actual, meses anteriores o el mes siguiente
-if ($ver_anteriores) {
-    $sql .= " AND (MONTH(fecha) < MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())) 
-              OR (YEAR(fecha) < YEAR(CURDATE()))";
-} elseif ($ver_siguientes) {
-    $sql .= " AND (MONTH(fecha) > MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())) 
-              OR (YEAR(fecha) > YEAR(CURDATE()))";
-} else {
-    $sql .= " AND MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())";
-}
+// Filtrar por el rango de fechas según el período
+$sql .= " AND fecha BETWEEN ? AND ?";
+$params[] = $fecha_ini;
+$params[] = $fecha_fin;
+$param_types .= 'ss';
 
-$sql .= " ORDER BY fecha";
+$sql .= " ORDER BY fecha, hora";
 $stmt = $conn->prepare($sql);
 if (!$stmt) {
     die("Error al preparar la consulta: " . $conn->error);
@@ -268,6 +229,11 @@ if ($pacientes === false) {
     exit();
 }
 
+// Obtener días deshabilitados para mostrar
+$diasDeshabilitados = isset($_SESSION['diasDeshabilitados'][$profesional][$sede]) 
+    ? $_SESSION['diasDeshabilitados'][$profesional][$sede] 
+    : [];
+
 // Mapear días de la semana
 $dias_semana = [
     0 => 'Domingo',
@@ -279,35 +245,69 @@ $dias_semana = [
     6 => 'Sábado'
 ];
 
-// Agrupar pacientes por día de la semana
-$pacientes_por_dia = [];
+// Crear un array para organizar los pacientes por fecha y hora
+$pacientes_por_fecha_hora = [];
 while ($row = $pacientes->fetch_assoc()) {
-    $dia_semana = date('N', strtotime($row['fecha'])) % 7; // 0 (para domingo) a 6 (para sábado)
-    if (!isset($pacientes_por_dia[$dia_semana])) {
-        $pacientes_por_dia[$dia_semana] = [];
+    $fecha = $row['fecha'];
+    $hora = date('H:i', strtotime($row['hora']));
+    
+    if (!isset($pacientes_por_fecha_hora[$fecha])) {
+        $pacientes_por_fecha_hora[$fecha] = [];
     }
-    $pacientes_por_dia[$dia_semana][] = $row;
+    
+    if (!isset($pacientes_por_fecha_hora[$fecha][$hora])) {
+        $pacientes_por_fecha_hora[$fecha][$hora] = [];
+    }
+    
+    $pacientes_por_fecha_hora[$fecha][$hora][] = $row;
 }
+
+// Obtener todas las horas únicas para mostrar en la tabla
+$todas_horas = [];
+foreach ($pacientes_por_fecha_hora as $fecha => $horas_pacientes) {
+    foreach ($horas_pacientes as $hora => $pacientes) {
+        if (!in_array($hora, $todas_horas)) {
+            $todas_horas[] = $hora;
+        }
+    }
+}
+
+// Adicionar horas de disponibilidad
+foreach ($disponibilidadProfesionales[$profesional][$sede] ?? [] as $dia => $horas) {
+    foreach ($horas as $hora) {
+        if (!in_array($hora, $todas_horas)) {
+            $todas_horas[] = $hora;
+        }
+    }
+}
+
+sort($todas_horas);
+
+// Nombres de los meses en español
+$meses = [
+    1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+    5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+    9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
+];
 ?>
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../bootstrap-5.1.3-dist/css/bootstrap.css">
+    <link rel="stylesheet" href="../css/estilos.css">
     <script src="../bootstrap-5.1.3-dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/989f8affb2.js" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300&family=Noto+Sans&family=Poppins:wght@300&display=swap" rel="stylesheet">
-    <script src="https://kit.fontawesome.com/989f8affb2.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="icon" href="../img/ISO_Violeta.png">
-    <!-- Tempus Dominus -->
-     
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.0.0-beta2/dist/css/tempus-dominus.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.0.0-beta2/dist/js/tempus-dominus.min.js"></script>
     <title>Kaizen - Pacientes</title>
     <style>
         body {
@@ -315,241 +315,445 @@ while ($row = $pacientes->fetch_assoc()) {
             margin: 0;
             padding: 0;
             background-color: #f9f9f9;
-            color: #333;
-            line-height: 1.6;
-            box-sizing: border-box;
         }
-
-        h1, h2 {
+        
+        header {
+            background-color: #8A2BE2;
+            color: white;
+        }
+        
+        .navbar {
+            padding: 10px 0;
+        }
+        
+        .container-fluid {
+            padding: 0 20px;
+        }
+        
+        .color {
+            height: 20px;
+            background-color: #8A2BE2;
+        }
+        
+        h1, h2, h3, h4 {
             color: #6b2870;
             text-align: center;
+            margin-bottom: 20px;
         }
-
-        .content {
+        
+        .content-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
             padding: 20px;
-            margin: auto;
-            width: 90%;
-            max-width: 1200px;
         }
-
+        
+        /* Estilos para el selector de período */
+        .periodo-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        
+        .periodo-btn {
+            margin: 0 5px;
+            padding: 8px 20px;
+            background-color: #f1f1f1;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        
+        .periodo-btn.active {
+            background-color: #8A2BE2;
+            color: white;
+            border-color: #8A2BE2;
+        }
+        
+        .periodo-btn:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .periodo-btn.active:hover {
+            background-color: #7B1FA2;
+        }
+        
+        /* Estilos para el filtro de búsqueda */
+        .filter-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .search-form {
+            display: flex;
+            flex: 1;
+            max-width: 600px;
+            margin-right: 15px;
+        }
+        
+        .search-form input {
+            margin-right: 10px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;            
+        }
+        
+        .search-btn {
+            background-color: #8A2BE2;
+            color: white;
+            border: none;
+            padding: 1px 20px;
+            height: 40px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .search-btn:hover {
+            background-color: #7B1FA2;
+        }
+        
+        /* Estilos para la navegación del mes */
+        .month-nav {
+            display: flex;
+            align-items: center;
+        }
+        
+        .month-nav a {
+            padding: 5px 10px;
+            background-color: #f1f1f1;
+            color: #333;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+        
+        .month-nav a:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .current-month {
+            font-weight: bold;
+            font-size: 16px;
+            color: #6b2870;
+        }
+        
+        /* Estilos para la tabla de pacientes */
         .table-container {
+            margin-bottom: 30px;
             overflow-x: auto;
-            margin-top: 20px;
         }
-
+        
         table {
             width: 100%;
             border-collapse: collapse;
-            background-color: #fff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 15px;
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-
-        th, td {
-            text-align: center;
-            padding: 10px;
-            border: 1px solid #ddd;
-        }
-
+        
         th {
-            background-color: #6b2870;
-            color: #fff;
+            background-color: #8A2BE2;
+            color: white;
+            padding: 12px;
+            text-align: center;
+            font-weight: 500;
         }
-
-        .patient-card {
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+        
+        td {
             padding: 10px;
-            margin: 5px auto;
+            border: 1px solid #e0e0e0;
             text-align: center;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            display: inline-block;
-            min-width: 110px;
+            vertical-align: top;
         }
-
-        .patient-card.yellow {
-            background-color: yellow;
+        
+        .hora-col {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            width: 80px;
         }
-
-        .patient-card:hover {
-            background-color: #e0e0e0;
+        
+        .fecha-header {
+            background-color: #f1f1f1;
+            color: #555;
+            padding: 5px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: bold;
         }
-
-        .button-container {
+        
+        .patient-cell {
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 6px;
+            margin-bottom: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Estilos para gestión de días deshabilitados */
+        .management-container {
             display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
         }
-
-        .button-container form {
-            flex-grow: 1;
-            text-align: center;
+        
+        .management-card {
+            flex: 1;
+            min-width: 300px;
+            background-color: white;
+            border-radius: 6px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-
-        .button-container button {
-            background-color: #6b2870;
+        
+        .management-card h3 {
+            color: #6b2870;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 8px 15px;
+            border-radius: 4px;
             cursor: pointer;
-            margin: 5px;
         }
-
-        .button-container button:hover {
-            background-color: #5a2060;
-        }
-
         
-
-        .btn_horarios button:hover{
-            color: #ddd;
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
         }
-
-        .navbar-collapse {
-        justify-content: flex-end; /* Asegura que los enlaces se alineen a la derecha */
-        }
-
-        .navbar-nav {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 15px;
-    }
-
-    .btn_horarios button {
-        background-color: #5a2060;
-        color: white;
-        border: none;
-        padding: 8px;
-        cursor: pointer;
-        border-radius: 10px !important;
-    }
-
-    .btn_horarios button:hover {
-        background-color:rgb(73, 26, 78);
-    }
-    
-    /* Asegurar que el navbar siempre se muestre en pantallas grandes */
-    @media (max-width: 992px) {
-
-
-
-        .ul_container{
-            display: flex !important;
-            flex-direction: column !important;
-            width: 100% !important;
-            align-items: flex-start; /* Alinea los elementos a la derecha */
-            margin-top: 10px; /* Agrega un pequeño espacio debajo del navbar */
-        }
-
-        .btn_horarios button {
-        background-color: #5a2060;
-        color: white;
-        border: none;
-        padding: 8px;
-        cursor: pointer;
-        width: 200px;
-        margin: 0px;
-        border-radius: 10px !important;
-        }
-
-        .agendar_link{
-            position: relative; 
-            background-color: #5a2060;
-            width: 200px;
-            padding: 8px;
-            border-radius: 10px !important;
-            color: #fff !important;
-            text-align: center;
-        }
-
-    }
         
+        /* Estilos para lista de días deshabilitados */
+        .dias-lista {
+            margin-top: 30px;
+            background-color: white;
+            border-radius: 6px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dias-lista h3 {
+            color: #6b2870;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .list-group-item {
+            padding: 10px 15px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        
+        /* Estilos responsive */
+        @media (max-width: 768px) {
+            .management-container {
+                flex-direction: column;
+            }
+            
+            .filter-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .search-form {
+                width: 100%;
+                margin-bottom: 15px;
+                margin-right: 0;
+                flex-wrap: wrap;
+            }
+            
+            .search-form input {
+                margin-bottom: 10px;
+                width: 100%;
+            }
+            
+            .month-nav {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
     </style>
 </head>
 <body>
-
-<header>
-<nav class="nav_container navbar navbar-dark navbar-expand-lg">
-    <div class="container-fluid">
-        <div class="logo_container">
-            <img class="logo" src="../img/ISO_Violeta.png" alt="Logo">
-        </div>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" 
-            aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
-            <ul class="ul_container navbar-nav ms-auto"> <!-- ms-auto empuja los elementos a la derecha -->
-                <li class="nav-item" class="">
-                    <a class="agendar_link nav_link nav-link" href="../index.php" >Agendar Paciente</a>
-                </li>
-                <li class="nav-item">
-                    <form method="POST" class="btn_horarios" action="pacientes.php">
-                        <input type="hidden" name="deshabilitar" value="1">
-                        <button type="submit">Deshabilitar Horarios</button>
-                    </form>                       
-                </li>
-                <li class="nav-item">
-                    <form method="POST" class="btn_horarios" action="pacientes.php">
-                        <input type="hidden" name="habilitar" value="1">
-                        <button type="submit">Habilitar Horarios</button>
-                    </form>                      
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
-</header>
-
-<div class="content">
-    <h1 style="font-weight: 600; letter-spacing: 10px;">Bienvenido <?php echo $profesional ?></h1>
-    <hr>
     
-    <div class="button-container">
-        
-       
-        <!-- <form method="POST" action="pacientes.php" id="modificarForm">
-            <input type="hidden" name="modificar" value="1">
-            <input type="hidden" name="nuevosHorarios" id="nuevosHorarios">
-            <button type="button" onclick="abrirModal()">Modificar Horarios</button>
-        </form> -->
-    </div>
 
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Lunes</th>
-                    <th>Martes</th>
-                    <th>Miércoles</th>
-                    <th>Jueves</th>
-                    <th>Viernes</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <?php for ($i = 1; $i <= 5; $i++): ?>
+    <div class="content-wrapper">
+        <h1 class="mt-4 mb-4">Pacientes de <?php echo $profesional; ?> - <?php echo $sede; ?></h1>
+        
+        <!-- Selector de período -->
+        <div class="periodo-selector">
+            <a href="?periodo=dia" class="periodo-btn <?php echo $periodo == 'dia' ? 'active' : ''; ?>">Hoy</a>
+            <a href="?periodo=semana" class="periodo-btn <?php echo $periodo == 'semana' ? 'active' : ''; ?>">Esta Semana</a>
+            <a href="?periodo=mes&mes=<?php echo $mes; ?>&anio=<?php echo $anio; ?>" class="periodo-btn <?php echo $periodo == 'mes' ? 'active' : ''; ?>">Este Mes</a>
+        </div>
+        
+        <!-- Filtros y navegación de meses -->
+        <div class="filter-container m-1">
+            <form method="GET" action="pacientes.php" class="search-form">
+                <input type="hidden" name="periodo" value="<?php echo $periodo; ?>">
+                <input type="hidden" name="mes" value="<?php echo $mes; ?>">
+                <input type="hidden" name="anio" value="<?php echo $anio; ?>">
+                <input type="text" name="nombre" placeholder="Buscar por nombre" value="<?php echo $busqueda_nombre; ?>">
+                <input type="text" name="obra_social" placeholder="Buscar por obra social" value="<?php echo $busqueda_obra_social; ?>">
+                <button type="submit" class="search-btn">Buscar</button>
+            </form>
+            
+            <?php if ($periodo == 'mes'): ?>
+            <div class="month-nav">
+                <a href="?periodo=mes&mes=<?php echo $mes_anterior; ?>&anio=<?php echo $anio_anterior; ?>">
+                    &lt; <?php echo $meses[$mes_anterior]; ?>
+                </a>
+                <span class="current-month"><?php echo $meses[(int)$mes] . ' ' . $anio; ?></span>
+                <a href="?periodo=mes&mes=<?php echo $mes_siguiente; ?>&anio=<?php echo $anio_siguiente; ?>">
+                    <?php echo $meses[$mes_siguiente]; ?> &gt;
+                </a>
+            </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Tabla de pacientes -->
+        <div class="table-container">
+            <h2>Pacientes del <?php echo date('d/m/Y', strtotime($fecha_ini)); ?> al <?php echo date('d/m/Y', strtotime($fecha_fin)); ?></h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <?php 
+                        $fechas_en_rango = [];
+                        $fecha_actual = new DateTime($fecha_ini);
+                        $fecha_fin_dt = new DateTime($fecha_fin);
+                        
+                        while ($fecha_actual <= $fecha_fin_dt) {
+                            $fecha_str = $fecha_actual->format('Y-m-d');
+                            $fechas_en_rango[] = $fecha_str;
+                            $dia_semana_num = (int)$fecha_actual->format('w');
+                            $dia_mes = $fecha_actual->format('d');
+                            echo "<th>" . $dias_semana[$dia_semana_num] . " " . $dia_mes . "</th>";
+                            $fecha_actual->modify('+1 day');
+                        }
+                        ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($todas_horas as $hora): ?>
+                    <tr>
+                        <td class="hora-col"><?php echo $hora; ?></td>
+                        <?php foreach ($fechas_en_rango as $fecha): ?>
                         <td>
-                            <?php if (isset($pacientes_por_dia[$i])): ?>
-                                <?php foreach ($pacientes_por_dia[$i] as $paciente): ?>
-                                    <div class="patient-card <?php echo $paciente['numero_sesion'] == 1 ? 'yellow' : ''; ?>" onclick="location.href='diagnostico.php?id=<?php echo $paciente['id']; ?>'">
-                                        <p><strong><?php echo $paciente['nombre']; ?></strong></p>
-                                        <p><?php echo $paciente['servicio']; ?></p>
-                                    </div>
+                            <?php if (isset($pacientes_por_fecha_hora[$fecha][$hora])): ?>
+                                <div class="fecha-header"><?php echo date('d/m/Y', strtotime($fecha)); ?></div>
+                                <?php foreach ($pacientes_por_fecha_hora[$fecha][$hora] as $paciente): ?>
+                                <div class="patient-cell">
+                                    <div><strong><?php echo $paciente['nombre']; ?></strong></div>
+                                    <small><?php echo $paciente['obra_social']; ?></small>
+                                </div>
                                 <?php endforeach; ?>
-                            <?php else: ?>
-                                <p>No hay pacientes programados.</p>
                             <?php endif; ?>
                         </td>
-                    <?php endfor; ?>
-                </tr>
-            </tbody>
-        </table>
+                        <?php endforeach; ?>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Gestión de días -->
+        <div class="management-container">
+            <!-- Formulario para deshabilitar días -->
+            <div class="management-card">
+                <h3>Deshabilitar un día</h3>
+                <form method="POST" action="pacientes.php">
+                    <label class="form-label" for="fecha_deshabilitar">Seleccione la fecha a deshabilitar:</label>
+                    <input type="date" id="fecha_deshabilitar" name="fecha_deshabilitar" class="form-input" required min="<?php echo date('Y-m-d'); ?>">
+                    <button type="submit" name="deshabilitar_dia" class="btn-danger">Deshabilitar día</button>
+                </form>
+            </div>
+            
+            <!-- Formulario para habilitar días deshabilitados -->
+            <div class="management-card">
+                <h3>Habilitar un día</h3>
+                <?php if (empty($diasDeshabilitados)): ?>
+                    <p>No hay días deshabilitados para este profesional en esta sede.</p>
+                <?php else: ?>
+                    <form method="POST" action="pacientes.php">
+                        <label class="form-label" for="fecha_habilitar">Seleccione la fecha a habilitar:</label>
+                        <select id="fecha_habilitar" name="fecha_habilitar" class="form-input" required>
+                            <?php foreach ($diasDeshabilitados as $fecha_deshabilitada): ?>
+                                <option value="<?php echo $fecha_deshabilitada; ?>"><?php echo date('d/m/Y', strtotime($fecha_deshabilitada)); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="submit" name="habilitar_dia" class="btn-success">Habilitar día</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Lista de días deshabilitados -->
+        <div class="dias-lista">
+            <h3>Días Deshabilitados</h3>
+            <?php if (empty($diasDeshabilitados)): ?>
+                <p>No hay días deshabilitados para este profesional en esta sede.</p>
+            <?php else: ?>
+                <ul class="list-group">
+                    <?php foreach ($diasDeshabilitados as $fecha_deshabilitada): ?>
+                        <li class="list-group-item"><?php echo date('d/m/Y (l)', strtotime($fecha_deshabilitada)); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
     </div>
-</div>
 
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar flatpickr para selección de fecha
+            flatpickr("#fecha_deshabilitar", {
+                dateFormat: "Y-m-d",
+                minDate: "today",
+                locale: {
+                    firstDayOfWeek: 1,
+                    weekdays: {
+                        shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+                        longhand: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+                    },
+                    months: {
+                        shorthand: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                        longhand: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>
