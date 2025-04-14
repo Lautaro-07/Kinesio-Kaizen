@@ -38,15 +38,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
+// Inicialización del array de días deshabilitados si no existe
+if (!isset($_SESSION['diasDeshabilitados'])) {
+    $_SESSION['diasDeshabilitados'] = [];
+}
+
+// Días deshabilitados para este profesional y sede
+$diasDeshabilitados = isset($_SESSION['diasDeshabilitados'][$profesional][$sede]) 
+    ? $_SESSION['diasDeshabilitados'][$profesional][$sede] 
+    : [];
+
 // Obtener las horas ocupadas para el profesional en una fecha específica (vía AJAX)
 if (isset($_GET['fecha'])) {
     $fecha = $_GET['fecha'];
     $diaSemana = date('l', strtotime($fecha)); // Obtener el día de la semana de la fecha seleccionada
+    
+    // Verificar si el día está deshabilitado específicamente
+    if (in_array($fecha, $diasDeshabilitados)) {
+        echo json_encode([]);
+        exit();
+    }
+    
+    // Siempre mostrar los horarios disponibles para este día a menos que esté deshabilitado
     $horasDisponibles = $disponibilidadProfesionales[$profesional][$sede][$diaSemana] ?? [];
 
     // Obtener las horas ocupadas de la base de datos
-    if ($_SESSION['servicio'] == 'Kinesiología') {
-        $stmt = $mysqli->prepare("SELECT TIME_FORMAT(hora, '%H:%i') as hora, COUNT(*) as count FROM turnos WHERE profesional = ? AND fecha = ? AND servicio = 'Kinesiología' GROUP BY hora HAVING count >= 4");
+    if (isset($_SESSION['servicio']) && $_SESSION['servicio'] == 'Rehabilitación') {
+        $stmt = $mysqli->prepare("SELECT TIME_FORMAT(hora, '%H:%i') as hora, COUNT(*) as count FROM turnos WHERE profesional = ? AND fecha = ? AND servicio = 'Rehabilitación' GROUP BY hora HAVING count >= 4");
     } else {
         $stmt = $mysqli->prepare("SELECT TIME_FORMAT(hora, '%H:%i') as hora FROM turnos WHERE profesional = ? AND fecha = ?");
     }
@@ -59,7 +77,7 @@ if (isset($_GET['fecha'])) {
         $horasOcupadas[] = $row['hora'];
     }
 
-    // Filtrar horarios disponibles
+    // Filtrar horarios disponibles (ocupados)
     $horasFinales = array_values(array_diff($horasDisponibles, $horasOcupadas));
     
     echo json_encode($horasFinales);
@@ -220,8 +238,14 @@ if (isset($_GET['fecha'])) {
             function(date) {
                 const diaSemana = date.toLocaleString("en", { weekday: "long" }); // Obtener el día en inglés
                 // Días disponibles para el profesional
-                const diasDisponibles = <?= json_encode(array_keys($disponibilidadProfesionales[$profesional][$sede])) ?>;
-                return !diasDisponibles.includes(diaSemana); // Deshabilitar días no disponibles
+                const diasDisponibles = <?= json_encode(array_keys($disponibilidadProfesionales[$profesional][$sede] ?? [])) ?>;
+                
+                // Verificar si la fecha específica está deshabilitada
+                const fechaFormateada = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+                const diasDeshabilitados = <?= json_encode($diasDeshabilitados) ?>;
+                
+                // Deshabilitar días no disponibles o días específicamente deshabilitados
+                return !diasDisponibles.includes(diaSemana) || diasDeshabilitados.includes(fechaFormateada);
             }
         ],
         onChange: function(selectedDates, dateStr, instance) {
